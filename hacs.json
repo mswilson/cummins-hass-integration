@@ -1,0 +1,8 @@
+{
+  "name": "Cummins Generator",
+  "content_in_root": false,
+  "filename": "cummins_generator.zip",
+  "render_readme": true,
+  "domains": ["sensor", "binary_sensor", "button", "select"],
+  "iot_class": "Local Polling"
+}
