@@ -57,6 +57,11 @@ This integration works with Cummins generators that have the standard web interf
 
 ## Troubleshooting
 
+N- The web interface may become unresponsive when modern web browsers
+   use multiple connections or other advanced features. It's a "site
+   best viewed in IE7" era web app. The polling from this integration
+   works without issue, but elements may become "unavailable" if you
+   use a browser at the same time.
 - Ensure generator is accessible on the network
 - Verify correct IP address and password
 - Check that generator switch is in REMOTE position for controls
