@@ -1,11 +1,11 @@
 {
   "domain": "cummins_generator",
   "name": "Cummins Generator",
+  "codeowners": ["@mswilson"],
   "config_flow": true,
   "documentation": "https://github.com/mswilson/cummins-hass-integration",
-  "requirements": ["aiohttp"],
-  "codeowners": ["@mswilson"],
-  "version": "0.0.1",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/mswilson/cummins-hass-integration/issues"
+  "issue_tracker": "https://github.com/mswilson/cummins-hass-integration/issues",
+  "requirements": ["aiohttp"],
+  "version": "0.0.1"
 }
