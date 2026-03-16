@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
       - name: HACS validation
-        uses: "hacs/action@06827d281b9c558c46d8ed6f4aae6c517fdc19ed"
+        uses: "hacs/action@dcb30e72781db3f207d5236b861172774ab0b485"
         with:
           category: "integration"
 
