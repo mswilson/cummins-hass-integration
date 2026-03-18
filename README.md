@@ -67,6 +67,23 @@ This integration works with Cummins generators that have the standard web interf
 - Check that generator switch is in REMOTE position for controls
 - Review Home Assistant logs for connection errors
 
+## AI Tooling Disclosure
+
+This work was produced with AI, namely the Amazon Q Developer CLI
+(which has subsequently been rebranded "Kiro CLI") in September
+2025. JavaScript functions from the web interface was extracted into
+files like `read-status.js` and then prompts such as
+
+> write a Home Assistant integration for a Cummins generator with a
+web browser interface. JavaScript to read the status of the generator
+has been extracted in read-status.js
+
+Everything in this repository is predominately the output of AI
+tooling, except for some sections of this README.md such as this one.
+
 ## License
 
-This project is licensed under the Apache License 2.0.
+As this is a machine-produced integration, I make no claims of human
+authorship. For any exclusive rights that are awarded to me that _can_
+be licensed with the Apache License 2.0, that is the legal instrument
+I elect to use to grant license to you.
