@@ -2,9 +2,10 @@
 import re
 import aiohttp
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from homeassistant.components.datetime import DateTimeEntity
 from homeassistant.const import CONF_HOST
+from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity import DeviceInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -73,20 +74,23 @@ class CumminsGeneratorDateTime(DateTimeEntity):
         minute = re.search(r"writeOptions\(0,59,(\d+)", html)
 
         if all([month, day, year, hour, minute]):
-            return datetime(
+            local = datetime(
                 int(year.group(1)),
                 int(month.group(1)),
                 int(day.group(1)),
                 int(hour.group(1)),
                 int(minute.group(1)),
+                tzinfo=dt_util.DEFAULT_TIME_ZONE,
             )
+            return dt_util.as_utc(local)
         return None
 
     async def async_set_value(self, value: datetime) -> None:
         """Set the generator date/time."""
+        local = dt_util.as_local(value)
         params = (
-            f"@448={value.month}&@449={value.day}&@450={value.year}"
-            f"&@402={value.hour}&@403={value.minute}"
+            f"@448={local.month}&@449={local.day}&@450={local.year}"
+            f"&@402={local.hour}&@403={local.minute}"
         )
         try:
             async with aiohttp.ClientSession() as session:

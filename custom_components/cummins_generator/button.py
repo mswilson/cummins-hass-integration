@@ -5,6 +5,7 @@ import logging
 from homeassistant.components.button import ButtonEntity
 from homeassistant.const import CONF_HOST
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 DOMAIN = "cummins_generator"
@@ -21,6 +22,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         CumminsGeneratorButton(host, auth, "enable_standby", "Enable Standby", "@385=1"),
         CumminsGeneratorButton(host, auth, "disable_standby", "Disable Standby", "@385=0"),
         CumminsGeneratorButton(host, auth, "exercise_now", "Exercise Now", "@242=3"),
+        CumminsGeneratorSyncTimeButton(host, auth),
     ]
     async_add_entities(buttons)
 
@@ -62,3 +64,37 @@ class CumminsGeneratorButton(ButtonEntity):
                         _LOGGER.error(f"Failed to execute {self._name}: {response.status}")
         except Exception as err:
             _LOGGER.error(f"Error executing {self._name}: {err}")
+
+
+class CumminsGeneratorSyncTimeButton(ButtonEntity):
+    """Button to sync generator time to HA clock."""
+
+    def __init__(self, host, auth):
+        self.host = host
+        self.auth = auth
+        self._attr_unique_id = f"{host}_sync_time"
+
+    @property
+    def name(self):
+        return "Cummins Generator Sync Time"
+
+    @property
+    def device_info(self):
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.host)},
+            name="Cummins Generator",
+            manufacturer="Cummins",
+            model="Generator",
+        )
+
+    async def async_press(self):
+        now = dt_util.now()
+        params = f"@448={now.month}&@449={now.day}&@450={now.year}&@402={now.hour}&@403={now.minute}"
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {"Authorization": f"Basic {self.auth}"}
+                async with session.get(f"http://{self.host}/wr_logical.cgi?{params}", headers=headers) as resp:
+                    if resp.status != 200:
+                        _LOGGER.error("Failed to sync time: %s", resp.status)
+        except Exception as err:
+            _LOGGER.error("Error syncing time: %s", err)
