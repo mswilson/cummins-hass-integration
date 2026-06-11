@@ -21,4 +21,4 @@ jobs:
     steps:
       - uses: "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
       - name: Hassfest validation
-        uses: "home-assistant/actions/hassfest@5752577ea7cc5aefb064b0b21432f18fe4d6ba90"
+        uses: "home-assistant/actions/hassfest@868e6cb4607727d764341a158d98872cd63fa658"
