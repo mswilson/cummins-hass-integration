@@ -1,10 +1,8 @@
 """Cummins Generator datetime platform."""
 import re
-import aiohttp
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from homeassistant.components.datetime import DateTimeEntity
-from homeassistant.const import CONF_HOST
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity import DeviceInfo
 
@@ -14,17 +12,18 @@ DOMAIN = "cummins_generator"
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator datetime entity."""
-    coordinator = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([CumminsGeneratorDateTime(coordinator)])
+    data = hass.data[DOMAIN][config_entry.entry_id]
+    async_add_entities([CumminsGeneratorDateTime(data["coordinator"], data["client"])])
 
 
 class CumminsGeneratorDateTime(DateTimeEntity):
     """DateTime entity for Cummins Generator time/date."""
 
-    def __init__(self, coordinator):
+    def __init__(self, coordinator, client):
         """Initialize the datetime entity."""
         self.coordinator = coordinator
-        self._attr_unique_id = f"{coordinator.host}_datetime"
+        self.client = client
+        self._attr_unique_id = f"{client.host}_datetime"
         self._attr_has_date = True
         self._attr_has_time = True
         self._value = None
@@ -36,7 +35,7 @@ class CumminsGeneratorDateTime(DateTimeEntity):
     @property
     def device_info(self):
         return DeviceInfo(
-            identifiers={(DOMAIN, self.coordinator.host)},
+            identifiers={(DOMAIN, self.client.host)},
             name="Cummins Generator",
             manufacturer="Cummins",
             model="Generator",
@@ -49,14 +48,8 @@ class CumminsGeneratorDateTime(DateTimeEntity):
     async def async_update(self):
         """Fetch current date/time from generator."""
         try:
-            async with aiohttp.ClientSession() as session:
-                headers = {"Authorization": f"Basic {self.coordinator.auth}"}
-                async with session.get(
-                    f"http://{self.coordinator.host}/timedate.html", headers=headers
-                ) as response:
-                    if response.status == 200:
-                        html = await response.text()
-                        self._value = self._parse_datetime(html)
+            html = await self.client.get("/timedate.html")
+            self._value = self._parse_datetime(html)
         except Exception as err:
             _LOGGER.error("Error fetching generator time: %s", err)
 
@@ -93,14 +86,8 @@ class CumminsGeneratorDateTime(DateTimeEntity):
             f"&@402={local.hour}&@403={local.minute}"
         )
         try:
-            async with aiohttp.ClientSession() as session:
-                headers = {"Authorization": f"Basic {self.coordinator.auth}"}
-                url = f"http://{self.coordinator.host}/wr_logical.cgi?{params}"
-                async with session.get(url, headers=headers) as response:
-                    if response.status != 200:
-                        _LOGGER.error("Failed to set date/time: %s", response.status)
-                    else:
-                        self._value = value.replace(second=0, microsecond=0)
-                        self.async_write_ha_state()
+            await self.client.get(f"/wr_logical.cgi?{params}")
+            self._value = value.replace(second=0, microsecond=0)
+            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Error setting date/time: %s", err)
