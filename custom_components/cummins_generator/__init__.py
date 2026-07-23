@@ -4,13 +4,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.const import CONF_HOST
 from .client import GeneratorClient
+from .const import CONF_MIN_REQUEST_GAP_MS, DEFAULT_MIN_REQUEST_GAP_MS
 from .sensor import CumminsGeneratorCoordinator
 
 DOMAIN = "cummins_generator"
 PLATFORMS = ["sensor", "button", "binary_sensor", "select", "datetime"]
-
-CONF_MIN_REQUEST_GAP_MS = "min_request_gap_ms"
-DEFAULT_MIN_REQUEST_GAP_MS = 500
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

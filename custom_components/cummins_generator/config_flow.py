@@ -4,10 +4,9 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.const import CONF_HOST, CONF_PASSWORD
 
-DOMAIN = "cummins_generator"
+from .const import CONF_MIN_REQUEST_GAP_MS, DEFAULT_MIN_REQUEST_GAP_MS
 
-CONF_MIN_REQUEST_GAP_MS = "min_request_gap_ms"
-DEFAULT_MIN_REQUEST_GAP_MS = 500
+DOMAIN = "cummins_generator"
 
 
 class CumminsGeneratorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):

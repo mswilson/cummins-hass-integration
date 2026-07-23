@@ -23,9 +23,9 @@
     "step": {
       "init": {
         "title": "Cummins Generator options",
-        "description": "The generator's embedded controller can lock up when it receives concurrent requests. Requests from this integration are already serialized; this setting adds a minimum delay between them.",
+        "description": "The generator's embedded controller can lock up when it receives concurrent requests. Requests from this integration are already serialized; this setting adds a minimum delay between them. The default of 50 ms is usually enough; increase it if the controller still becomes unresponsive.",
         "data": {
-          "min_request_gap_ms": "Minimum delay between requests (ms)"
+          "min_request_gap_ms": "Minimum delay between requests (ms, default 50)"
         }
       }
     }
