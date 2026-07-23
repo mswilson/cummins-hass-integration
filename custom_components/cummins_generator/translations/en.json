@@ -18,5 +18,16 @@
     "abort": {
       "already_configured": "Generator is already configured"
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Cummins Generator options",
+        "description": "The generator's embedded controller can lock up when it receives concurrent requests. Requests from this integration are already serialized; this setting adds a minimum delay between them.",
+        "data": {
+          "min_request_gap_ms": "Minimum delay between requests (ms)"
+        }
+      }
+    }
   }
 }

@@ -1,9 +1,6 @@
 """Cummins Generator select platform."""
-import aiohttp
-import base64
 import logging
 from homeassistant.components.select import SelectEntity
-from homeassistant.const import CONF_HOST
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from datetime import timedelta
@@ -14,9 +11,8 @@ SCAN_INTERVAL = timedelta(seconds=30)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator select entities."""
-    host = config_entry.data[CONF_HOST]
-    password = config_entry.data.get("password", "cummins")
-    coordinator = CumminsLoadCoordinator(hass, host, password)
+    client = hass.data[DOMAIN][config_entry.entry_id]["client"]
+    coordinator = CumminsLoadCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()
     
     selects = [
@@ -33,45 +29,31 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class CumminsLoadCoordinator(DataUpdateCoordinator):
     """Data coordinator for Cummins Generator load management."""
 
-    def __init__(self, hass, host, password):
+    def __init__(self, hass, client):
         """Initialize the coordinator."""
         super().__init__(hass, _LOGGER, name="Cummins Load", update_interval=SCAN_INTERVAL)
-        self.host = host
-        self.auth = base64.b64encode(f"admin:{password}".encode()).decode("ascii")
+        self.client = client
+        self.host = client.host
 
     async def _async_update_data(self):
         """Fetch load data from the generator."""
         try:
-            async with aiohttp.ClientSession() as session:
-                headers = {"Authorization": f"Basic {self.auth}"}
-                
-                # Get load data from loads.html
-                load_data = {}
-                async with session.get(f"http://{self.host}/loads.html", headers=headers) as response:
-                    if response.status == 200:
-                        html = await response.text()
-                        load_data = self._parse_loads_html(html)
-                
-                # Get load status from loads_data.html
-                async with session.get(f"http://{self.host}/loads_data.html", headers=headers) as response:
-                    if response.status == 200:
-                        data = await response.text()
-                        lines = data.strip().split('\n')
-                        if len(lines) >= 3:
-                            load_data.update({
-                                "load_1": "Connected" if int(lines[1]) == 0 else "Disconnected",
-                                "load_2": "Connected" if int(lines[2]) == 0 else "Disconnected",
-                            })
-                
-                # Get exercise data
-                exercise_data = {}
-                async with session.get(f"http://{self.host}/exercise.html", headers=headers) as response:
-                    if response.status == 200:
-                        html = await response.text()
-                        exercise_data = self._parse_exercise_html(html)
-                
-                return {**load_data, **exercise_data}
-                
+            load_html = await self.client.get("/loads.html")
+            load_data = self._parse_loads_html(load_html)
+
+            loads_data = await self.client.get("/loads_data.html")
+            lines = loads_data.strip().split('\n')
+            if len(lines) >= 3:
+                load_data.update({
+                    "load_1": "Connected" if int(lines[1]) == 0 else "Disconnected",
+                    "load_2": "Connected" if int(lines[2]) == 0 else "Disconnected",
+                })
+
+            exercise_html = await self.client.get("/exercise.html")
+            exercise_data = self._parse_exercise_html(exercise_html)
+
+            return {**load_data, **exercise_data}
+
         except Exception as err:
             raise UpdateFailed(f"Error communicating with generator: {err}")
 
@@ -160,37 +142,33 @@ class CumminsGeneratorSelect(SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
+        if self.select_type == "load_mode":
+            value = "1" if option == "Manual" else "2"
+            path = f"/wr_logical.cgi?@426={value}"
+        elif self.select_type == "load_1":
+            value = "3" if option == "Disconnected" else "4"
+            path = f"/wr_logical.cgi?@426={value}"
+        elif self.select_type == "load_2":
+            value = "5" if option == "Disconnected" else "6"
+            path = f"/wr_logical.cgi?@426={value}"
+        elif self.select_type == "exercise_frequency":
+            value = ["0", "1", "2", "3"][["Never", "Weekly", "Bimonthly", "Monthly"].index(option)]
+            path = f"/wr_logical.cgi?@425={value}"
+        elif self.select_type == "exercise_day":
+            value = str(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].index(option))
+            path = f"/wr_logical.cgi?@391={value}"
+        elif self.select_type == "exercise_hour":
+            path = f"/wr_logical.cgi?@392={option}"
+        elif self.select_type == "exercise_minute":
+            path = f"/wr_logical.cgi?@393={option}"
+        else:
+            return
+
         try:
-            async with aiohttp.ClientSession() as session:
-                headers = {"Authorization": f"Basic {self.coordinator.auth}"}
-                
-                if self.select_type == "load_mode":
-                    value = "1" if option == "Manual" else "2"
-                    url = f"http://{self.coordinator.host}/wr_logical.cgi?@426={value}"
-                elif self.select_type == "load_1":
-                    value = "3" if option == "Disconnected" else "4"
-                    url = f"http://{self.coordinator.host}/wr_logical.cgi?@426={value}"
-                elif self.select_type == "load_2":
-                    value = "5" if option == "Disconnected" else "6"
-                    url = f"http://{self.coordinator.host}/wr_logical.cgi?@426={value}"
-                elif self.select_type == "exercise_frequency":
-                    value = ["0", "1", "2", "3"][["Never", "Weekly", "Bimonthly", "Monthly"].index(option)]
-                    url = f"http://{self.coordinator.host}/wr_logical.cgi?@425={value}"
-                elif self.select_type == "exercise_day":
-                    value = str(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].index(option))
-                    url = f"http://{self.coordinator.host}/wr_logical.cgi?@391={value}"
-                elif self.select_type == "exercise_hour":
-                    url = f"http://{self.coordinator.host}/wr_logical.cgi?@392={option}"
-                elif self.select_type == "exercise_minute":
-                    url = f"http://{self.coordinator.host}/wr_logical.cgi?@393={option}"
-                
-                async with session.get(url, headers=headers) as response:
-                    if response.status != 200:
-                        _LOGGER.error(f"Failed to set {self._name}: {response.status}")
-                    else:
-                        await self.coordinator.async_request_refresh()
+            await self.coordinator.client.get(path)
+            await self.coordinator.async_request_refresh()
         except Exception as err:
-            _LOGGER.error(f"Error setting {self._name}: {err}")
+            _LOGGER.error("Error setting %s: %s", self._name, err)
 
     async def async_update(self):
         """Update the entity."""

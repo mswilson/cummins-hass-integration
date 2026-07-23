@@ -1,14 +1,12 @@
 """Cummins Generator binary sensor platform."""
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorDeviceClass
-from homeassistant.const import CONF_HOST
 from homeassistant.helpers.entity import DeviceInfo
-from .sensor import CumminsGeneratorCoordinator
 
 DOMAIN = "cummins_generator"
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator binary sensors."""
-    coordinator = hass.data["cummins_generator"][config_entry.entry_id]
+    coordinator = hass.data["cummins_generator"][config_entry.entry_id]["coordinator"]
     
     binary_sensors = [
         CumminsGeneratorBinarySensor(coordinator, "utility_present", "Utility Present", 0x01),
