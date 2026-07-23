@@ -29,14 +29,11 @@ class CumminsGeneratorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
-        return CumminsGeneratorOptionsFlow(config_entry)
+        return CumminsGeneratorOptionsFlow()
 
 
 class CumminsGeneratorOptionsFlow(config_entries.OptionsFlow):
     """Options flow for Cummins Generator."""
-
-    def __init__(self, config_entry):
-        self.config_entry = config_entry
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
