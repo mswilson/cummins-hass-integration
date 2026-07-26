@@ -1,11 +1,7 @@
 """Cummins Generator sensor platform."""
-import asyncio
-import aiohttp
-import base64
 import logging
 from datetime import timedelta
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
-from homeassistant.const import CONF_HOST
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.entity import DeviceInfo
 
@@ -15,8 +11,8 @@ DOMAIN = "cummins_generator"
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator sensors."""
-    coordinator = hass.data["cummins_generator"][config_entry.entry_id]
-    
+    coordinator = hass.data["cummins_generator"][config_entry.entry_id]["coordinator"]
+
     sensors = [
         CumminsGeneratorSensor(coordinator, "status", "Status"),
         CumminsGeneratorSensor(coordinator, "battery_voltage", "Battery Voltage", "V"),
@@ -31,23 +27,17 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 class CumminsGeneratorCoordinator(DataUpdateCoordinator):
     """Data coordinator for Cummins Generator."""
 
-    def __init__(self, hass, host, password):
+    def __init__(self, hass, client):
         """Initialize the coordinator."""
         super().__init__(hass, _LOGGER, name="Cummins Generator", update_interval=SCAN_INTERVAL)
-        self.host = host
-        self.auth = base64.b64encode(f"admin:{password}".encode()).decode("ascii")
+        self.client = client
+        self.host = client.host
 
     async def _async_update_data(self):
         """Fetch data from the generator."""
         try:
-            async with aiohttp.ClientSession() as session:
-                headers = {"Authorization": f"Basic {self.auth}"}
-                async with session.get(f"http://{self.host}/index_data.html", headers=headers) as response:
-                    if response.status == 200:
-                        data = await response.text()
-                        return self._parse_data(data)
-                    else:
-                        raise UpdateFailed(f"Error fetching data: {response.status}")
+            data = await self.client.get("/index_data.html")
+            return self._parse_data(data)
         except Exception as err:
             raise UpdateFailed(f"Error communicating with generator: {err}")
 
