@@ -1,12 +1,13 @@
 """Cummins Generator datetime platform."""
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from homeassistant.components.datetime import DateTimeEntity
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity import DeviceInfo
 
 _LOGGER = logging.getLogger(__name__)
+SCAN_INTERVAL = timedelta(hours=1)
 DOMAIN = "cummins_generator"
 
 
