@@ -26,6 +26,20 @@ A Home Assistant custom integration for monitoring and controlling Cummins stand
 - **Load Management** - Manual/Automatic mode with individual load control
 - **Exercise Schedule** - Configure frequency, day, and time
 
+## Polling Intervals
+
+The integration polls the generator's web interface on a per-platform cadence:
+
+| Platform / entity group | Interval | Endpoint |
+|---|---|---|
+| Sensors (status, voltages, frequency, engine hours, loads) | 30 s | `/index_data.html` |
+| Binary sensors (utility, running, standby, action required) | 30 s | shares the sensor poll |
+| Load & exercise selects | 30 s | `/loads_data.html`, `/exercise.html` |
+| Date/time entity | 1 h | `/timedate.html` |
+| Buttons | on demand | control endpoints only |
+
+Requests are additionally spaced out by a configurable minimum request gap (default 500 ms) to avoid overwhelming the generator's web interface.
+
 ## Installation
 
 1. Copy the `custom_components/cummins_generator` folder to your Home Assistant `config/custom_components/` directory

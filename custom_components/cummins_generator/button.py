@@ -1,8 +1,11 @@
 """Cummins Generator button platform."""
 import logging
 from homeassistant.components.button import ButtonEntity
+from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.util import dt as dt_util
+
+from .datetime import signal_time_updated
 
 _LOGGER = logging.getLogger(__name__)
 DOMAIN = "cummins_generator"
@@ -84,3 +87,7 @@ class CumminsGeneratorSyncTimeButton(ButtonEntity):
             await self.client.get(f"/wr_logical.cgi?{params}")
         except Exception as err:
             _LOGGER.error("Error syncing time: %s", err)
+            return
+        async_dispatcher_send(
+            self.hass, signal_time_updated(self.client.host), dt_util.as_utc(now)
+        )

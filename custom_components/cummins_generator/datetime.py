@@ -1,19 +1,30 @@
 """Cummins Generator datetime platform."""
 import re
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from homeassistant.components.datetime import DateTimeEntity
+from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import DeviceInfo
 
 _LOGGER = logging.getLogger(__name__)
+SCAN_INTERVAL = timedelta(hours=1)
 DOMAIN = "cummins_generator"
+
+
+def signal_time_updated(host: str) -> str:
+    """Dispatcher signal fired when a write pushes a fresh value."""
+    return f"cummins_generator_datetime_updated_{host}"
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator datetime entity."""
     data = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([CumminsGeneratorDateTime(data["coordinator"], data["client"])])
+    async_add_entities(
+        [CumminsGeneratorDateTime(data["coordinator"], data["client"])],
+        update_before_add=True,
+    )
 
 
 class CumminsGeneratorDateTime(DateTimeEntity):
@@ -44,6 +55,22 @@ class CumminsGeneratorDateTime(DateTimeEntity):
     @property
     def native_value(self):
         return self._value
+
+    async def async_added_to_hass(self) -> None:
+        """Subscribe to write-side pushes from the sync button."""
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass,
+                signal_time_updated(self.client.host),
+                self._handle_pushed_value,
+            )
+        )
+
+    @callback
+    def _handle_pushed_value(self, value: datetime) -> None:
+        """Adopt a value freshly written to the generator, no re-read needed."""
+        self._value = value.replace(second=0, microsecond=0)
+        self.async_write_ha_state()
 
     async def async_update(self):
         """Fetch current date/time from generator."""
@@ -87,7 +114,6 @@ class CumminsGeneratorDateTime(DateTimeEntity):
         )
         try:
             await self.client.get(f"/wr_logical.cgi?{params}")
-            self._value = value.replace(second=0, microsecond=0)
-            self.async_write_ha_state()
+            self._handle_pushed_value(value)
         except Exception as err:
             _LOGGER.error("Error setting date/time: %s", err)
