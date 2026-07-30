@@ -43,6 +43,7 @@ async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> Non
     data["client"].update_min_gap(
         entry.options.get(CONF_MIN_REQUEST_GAP_MS, DEFAULT_MIN_REQUEST_GAP_MS)
     )
+    data["client"].update_password(entry.data.get("password", "cummins"))
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

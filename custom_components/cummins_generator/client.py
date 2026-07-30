@@ -10,9 +10,42 @@ import base64
 import logging
 import aiohttp
 
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
+
 _LOGGER = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 10
+
+
+class InvalidAuth(Exception):
+    """Generator rejected the supplied password."""
+
+
+class CannotConnect(Exception):
+    """Could not reach the generator."""
+
+
+async def validate_credentials(hass, host: str, password: str) -> None:
+    """Probe the generator with the given credentials.
+
+    Raises InvalidAuth on 401 or CannotConnect on any other failure.
+    """
+    session = async_get_clientsession(hass)
+    auth_header = "Basic " + base64.b64encode(
+        f"admin:{password}".encode()
+    ).decode("ascii")
+    url = f"http://{host}/index_data.html"
+    timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
+    try:
+        async with session.get(
+            url, headers={"Authorization": auth_header}, timeout=timeout
+        ) as response:
+            if response.status == 401:
+                raise InvalidAuth
+            if response.status != 200:
+                raise CannotConnect(f"HTTP {response.status}")
+    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        raise CannotConnect(str(err)) from err
 
 
 class GeneratorClient:
@@ -32,6 +65,12 @@ class GeneratorClient:
     def update_min_gap(self, min_gap_ms):
         """Change the minimum inter-request gap live."""
         self._min_gap = max(0, min_gap_ms) / 1000.0
+
+    def update_password(self, password):
+        """Change the admin password live."""
+        self._auth_header = "Basic " + base64.b64encode(
+            f"admin:{password}".encode()
+        ).decode("ascii")
 
     async def get(self, path: str) -> str:
         """Issue a serialized, rate-limited GET and return the body text."""

@@ -23,11 +23,16 @@
     "step": {
       "init": {
         "title": "Cummins Generator options",
-        "description": "The generator's embedded controller can lock up when it receives concurrent requests. Requests from this integration are already serialized; this setting adds a minimum delay between them.",
+        "description": "The generator's embedded controller can lock up when it receives concurrent requests. Requests from this integration are already serialized; the delay setting adds a minimum gap between them.",
         "data": {
+          "password": "Password",
           "min_request_gap_ms": "Minimum delay between requests (ms, default 500)"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to generator",
+      "invalid_auth": "Invalid authentication"
     }
   }
 }
