@@ -36,15 +36,23 @@ class CumminsGeneratorOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input=None):
         if user_input is not None:
+            new_password = user_input.pop(CONF_PASSWORD)
+            if new_password != self.config_entry.data.get(CONF_PASSWORD):
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data={**self.config_entry.data, CONF_PASSWORD: new_password},
+                )
             return self.async_create_entry(title="", data=user_input)
 
-        current = self.config_entry.options.get(
+        current_gap = self.config_entry.options.get(
             CONF_MIN_REQUEST_GAP_MS, DEFAULT_MIN_REQUEST_GAP_MS
         )
+        current_password = self.config_entry.data.get(CONF_PASSWORD, "cummins")
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema({
-                vol.Required(CONF_MIN_REQUEST_GAP_MS, default=current): vol.All(
+                vol.Required(CONF_PASSWORD, default=current_password): str,
+                vol.Required(CONF_MIN_REQUEST_GAP_MS, default=current_gap): vol.All(
                     vol.Coerce(int), vol.Range(min=0, max=10000)
                 ),
             }),

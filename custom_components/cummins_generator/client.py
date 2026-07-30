@@ -33,6 +33,12 @@ class GeneratorClient:
         """Change the minimum inter-request gap live."""
         self._min_gap = max(0, min_gap_ms) / 1000.0
 
+    def update_password(self, password):
+        """Change the admin password live."""
+        self._auth_header = "Basic " + base64.b64encode(
+            f"admin:{password}".encode()
+        ).decode("ascii")
+
     async def get(self, path: str) -> str:
         """Issue a serialized, rate-limited GET and return the body text."""
         headers = {"Authorization": self._auth_header}
