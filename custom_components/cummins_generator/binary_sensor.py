@@ -1,6 +1,7 @@
 """Cummins Generator binary sensor platform."""
 from homeassistant.components.binary_sensor import BinarySensorEntity, BinarySensorDeviceClass
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 DOMAIN = "cummins_generator"
 
@@ -17,12 +18,12 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     ]
     async_add_entities(binary_sensors)
 
-class CumminsGeneratorBinarySensor(BinarySensorEntity):
+class CumminsGeneratorBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Representation of a Cummins Generator binary sensor."""
 
     def __init__(self, coordinator, sensor_type, name, mask):
         """Initialize the binary sensor."""
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.sensor_type = sensor_type
         self._name = name
         self.mask = mask
@@ -56,12 +57,3 @@ class CumminsGeneratorBinarySensor(BinarySensorEntity):
             return False
         lcd_status = self.coordinator.data.get("lcd_status", 0)
         return bool(lcd_status & self.mask)
-
-    @property
-    def available(self):
-        """Return if entity is available."""
-        return self.coordinator.last_update_success
-
-    async def async_update(self):
-        """Update the entity."""
-        await self.coordinator.async_request_refresh()

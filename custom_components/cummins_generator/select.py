@@ -2,7 +2,11 @@
 import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
 from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
@@ -102,12 +106,12 @@ class CumminsLoadCoordinator(DataUpdateCoordinator):
             "exercise_minute": minute if minute in min_options else "00",
         }
 
-class CumminsGeneratorSelect(SelectEntity):
+class CumminsGeneratorSelect(CoordinatorEntity, SelectEntity):
     """Representation of a Cummins Generator select entity."""
 
     def __init__(self, coordinator, select_type, name, options):
         """Initialize the select entity."""
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.select_type = select_type
         self._name = name
         self._attr_options = options
@@ -134,11 +138,6 @@ class CumminsGeneratorSelect(SelectEntity):
         if not self.coordinator.data:
             return None
         return self.coordinator.data.get(self.select_type)
-
-    @property
-    def available(self):
-        """Return if entity is available."""
-        return self.coordinator.last_update_success
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
@@ -169,7 +168,3 @@ class CumminsGeneratorSelect(SelectEntity):
             await self.coordinator.async_request_refresh()
         except Exception as err:
             _LOGGER.error("Error setting %s: %s", self._name, err)
-
-    async def async_update(self):
-        """Update the entity."""
-        await self.coordinator.async_request_refresh()
