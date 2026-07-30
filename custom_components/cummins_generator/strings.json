@@ -29,6 +29,10 @@
           "min_request_gap_ms": "Minimum delay between requests (ms, default 500)"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to generator",
+      "invalid_auth": "Invalid authentication"
     }
   }
 }
