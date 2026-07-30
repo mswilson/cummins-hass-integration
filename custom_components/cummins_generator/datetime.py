@@ -14,7 +14,10 @@ DOMAIN = "cummins_generator"
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator datetime entity."""
     data = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([CumminsGeneratorDateTime(data["coordinator"], data["client"])])
+    async_add_entities(
+        [CumminsGeneratorDateTime(data["coordinator"], data["client"])],
+        update_before_add=True,
+    )
 
 
 class CumminsGeneratorDateTime(DateTimeEntity):
