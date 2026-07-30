@@ -1,7 +1,9 @@
 """Cummins Generator sensor platform."""
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
+from homeassistant.core import callback
+from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.update_coordinator import (
     CoordinatorEntity,
     DataUpdateCoordinator,
@@ -9,13 +11,17 @@ from homeassistant.helpers.update_coordinator import (
 )
 from homeassistant.helpers.entity import DeviceInfo
 
+from .datetime import signal_time_read
+
 _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=30)
 DOMAIN = "cummins_generator"
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator sensors."""
-    coordinator = hass.data["cummins_generator"][config_entry.entry_id]["coordinator"]
+    data = hass.data["cummins_generator"][config_entry.entry_id]
+    coordinator = data["coordinator"]
+    client = data["client"]
 
     sensors = [
         CumminsGeneratorSensor(coordinator, "status", "Status"),
@@ -25,6 +31,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         CumminsGeneratorSensor(coordinator, "engine_hours", "Engine Hours", "h"),
         CumminsGeneratorSensor(coordinator, "load_1", "Load Line 1", "%"),
         CumminsGeneratorSensor(coordinator, "load_2", "Load Line 2", "%"),
+        CumminsGeneratorTimeDriftSensor(client.host),
     ]
     async_add_entities(sensors)
 
@@ -112,3 +119,50 @@ class CumminsGeneratorSensor(CoordinatorEntity, SensorEntity):
     def native_unit_of_measurement(self):
         """Return the unit of measurement."""
         return self._unit
+
+
+class CumminsGeneratorTimeDriftSensor(SensorEntity):
+    """Signed seconds by which the generator clock leads HA's clock.
+
+    The generator reports date/time only to minute precision, so this
+    reading quantizes to the nearest minute; sub-minute values reflect
+    that rounding more than real drift.
+    """
+
+    _attr_should_poll = False
+    _attr_native_unit_of_measurement = "s"
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, host):
+        self._host = host
+        self._attr_unique_id = f"{host}_time_drift"
+        self._value: float | None = None
+
+    @property
+    def name(self):
+        return "Cummins Generator Time Drift"
+
+    @property
+    def native_value(self):
+        return self._value
+
+    @property
+    def device_info(self):
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._host)},
+            name="Cummins Generator",
+            manufacturer="Cummins",
+            model="Generator",
+        )
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, signal_time_read(self._host), self._handle_read
+            )
+        )
+
+    @callback
+    def _handle_read(self, generator_utc: datetime, ha_utc: datetime) -> None:
+        self._value = (generator_utc - ha_utc).total_seconds()
+        self.async_write_ha_state()
