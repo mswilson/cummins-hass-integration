@@ -82,6 +82,12 @@ class CumminsGeneratorDateTime(DateTimeEntity):
         """Adopt a value freshly written to the generator, no re-read needed."""
         self._value = value.replace(second=0, microsecond=0)
         self.async_write_ha_state()
+        async_dispatcher_send(
+            self.hass,
+            signal_time_read(self.client.host),
+            self._value,
+            dt_util.utcnow(),
+        )
 
     async def async_update(self):
         """Fetch current date/time from generator."""
