@@ -1,5 +1,7 @@
 """Cummins Generator button platform."""
+import asyncio
 import logging
+from datetime import timedelta
 from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.entity import DeviceInfo
@@ -81,13 +83,23 @@ class CumminsGeneratorSyncTimeButton(ButtonEntity):
         )
 
     async def async_press(self):
+        # The generator only accepts date/time to the minute. Sleep until
+        # the next :00 wall-clock second and write that minute, so the
+        # request lands within a second of when the generator would
+        # advance its clock anyway.
         now = dt_util.now()
-        params = f"@448={now.month}&@449={now.day}&@450={now.year}&@402={now.hour}&@403={now.minute}"
+        target = (now + timedelta(minutes=1)).replace(second=0, microsecond=0)
+        await asyncio.sleep(max(0.0, (target - now).total_seconds()))
+
+        params = (
+            f"@448={target.month}&@449={target.day}&@450={target.year}"
+            f"&@402={target.hour}&@403={target.minute}"
+        )
         try:
             await self.client.get(f"/wr_logical.cgi?{params}")
         except Exception as err:
             _LOGGER.error("Error syncing time: %s", err)
             return
         async_dispatcher_send(
-            self.hass, signal_time_updated(self.client.host), dt_util.as_utc(now)
+            self.hass, signal_time_updated(self.client.host), dt_util.as_utc(target)
         )
