@@ -164,5 +164,6 @@ class CumminsGeneratorTimeDriftSensor(SensorEntity):
 
     @callback
     def _handle_read(self, generator_utc: datetime, ha_utc: datetime) -> None:
-        self._value = round((generator_utc - ha_utc).total_seconds() / 60)
+        ha_minute = ha_utc.replace(second=0, microsecond=0)
+        self._value = round((generator_utc - ha_minute).total_seconds() / 60)
         self.async_write_ha_state()
