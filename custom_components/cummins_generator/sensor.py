@@ -2,7 +2,11 @@
 import logging
 from datetime import timedelta
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
+    UpdateFailed,
+)
 from homeassistant.helpers.entity import DeviceInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -65,12 +69,12 @@ class CumminsGeneratorCoordinator(DataUpdateCoordinator):
             "lcd_status": int(lines[13]),
         }
 
-class CumminsGeneratorSensor(SensorEntity):
+class CumminsGeneratorSensor(CoordinatorEntity, SensorEntity):
     """Representation of a Cummins Generator sensor."""
 
     def __init__(self, coordinator, sensor_type, name, unit=None):
         """Initialize the sensor."""
-        self.coordinator = coordinator
+        super().__init__(coordinator)
         self.sensor_type = sensor_type
         self._name = name
         self._unit = unit
@@ -100,20 +104,11 @@ class CumminsGeneratorSensor(SensorEntity):
         )
 
     @property
-    def state(self):
-        """Return the state of the sensor."""
+    def native_value(self):
+        """Return the current sensor value."""
         return self.coordinator.data.get(self.sensor_type)
 
     @property
     def native_unit_of_measurement(self):
         """Return the unit of measurement."""
         return self._unit
-
-    @property
-    def available(self):
-        """Return if entity is available."""
-        return self.coordinator.last_update_success
-
-    async def async_update(self):
-        """Update the entity."""
-        await self.coordinator.async_request_refresh()
