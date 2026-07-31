@@ -122,21 +122,21 @@ class CumminsGeneratorSensor(CoordinatorEntity, SensorEntity):
 
 
 class CumminsGeneratorTimeDriftSensor(SensorEntity):
-    """Signed seconds by which the generator clock leads HA's clock.
+    """Signed minutes representing the difference between the generator
+    clock and HA's clock.
 
-    The generator reports date/time only to minute precision, so this
-    reading quantizes to the nearest minute; sub-minute values reflect
-    that rounding more than real drift.
+    The generator only reports date/time to minute precision, so the
+    raw delta is rounded to the nearest whole minute.
     """
 
     _attr_should_poll = False
-    _attr_native_unit_of_measurement = "s"
+    _attr_native_unit_of_measurement = "min"
     _attr_suggested_display_precision = 0
 
     def __init__(self, host):
         self._host = host
         self._attr_unique_id = f"{host}_time_drift"
-        self._value: float | None = None
+        self._value: int | None = None
 
     @property
     def name(self):
@@ -164,5 +164,5 @@ class CumminsGeneratorTimeDriftSensor(SensorEntity):
 
     @callback
     def _handle_read(self, generator_utc: datetime, ha_utc: datetime) -> None:
-        self._value = (generator_utc - ha_utc).total_seconds()
+        self._value = round((generator_utc - ha_utc).total_seconds() / 60)
         self.async_write_ha_state()
