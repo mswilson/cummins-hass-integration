@@ -11,6 +11,7 @@ A Home Assistant custom integration for monitoring and controlling Cummins stand
 - **Frequency** - Output frequency in Hz
 - **Engine Hours** - Total runtime hours
 - **Load Line 1 & 2** - Current load percentages
+- **Time Drift** - Signed minutes representing the difference between the generator clock and Home Assistant's clock
 
 ### Binary Sensors
 - **Utility Present** - Utility power availability

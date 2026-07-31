@@ -5,7 +5,10 @@ from datetime import datetime, timedelta
 from homeassistant.components.datetime import DateTimeEntity
 from homeassistant.core import callback
 from homeassistant.util import dt as dt_util
-from homeassistant.helpers.dispatcher import async_dispatcher_connect
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.entity import DeviceInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -16,6 +19,14 @@ DOMAIN = "cummins_generator"
 def signal_time_updated(host: str) -> str:
     """Dispatcher signal fired when a write pushes a fresh value."""
     return f"cummins_generator_datetime_updated_{host}"
+
+
+def signal_time_read(host: str) -> str:
+    """Dispatcher signal fired after each successful read from the generator.
+
+    Payload is (generator_utc, ha_utc_at_read).
+    """
+    return f"cummins_generator_datetime_read_{host}"
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -71,14 +82,29 @@ class CumminsGeneratorDateTime(DateTimeEntity):
         """Adopt a value freshly written to the generator, no re-read needed."""
         self._value = value.replace(second=0, microsecond=0)
         self.async_write_ha_state()
+        async_dispatcher_send(
+            self.hass,
+            signal_time_read(self.client.host),
+            self._value,
+            dt_util.utcnow(),
+        )
 
     async def async_update(self):
         """Fetch current date/time from generator."""
         try:
             html = await self.client.get("/timedate.html")
-            self._value = self._parse_datetime(html)
         except Exception as err:
             _LOGGER.error("Error fetching generator time: %s", err)
+            return
+        parsed = self._parse_datetime(html)
+        if parsed is None:
+            return
+        ha_now = dt_util.utcnow()
+        self._value = parsed
+        if self.hass is not None:
+            async_dispatcher_send(
+                self.hass, signal_time_read(self.client.host), parsed, ha_now
+            )
 
     def _parse_datetime(self, html):
         """Parse date/time from timedate.html."""
