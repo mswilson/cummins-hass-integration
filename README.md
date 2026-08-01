@@ -61,6 +61,63 @@ The integration requires:
 - Network connectivity to generator
 - Generator switch in REMOTE position for control functions
 
+## Securing Your Generator
+
+The embedded web interface on these controllers runs an old
+InterNiche Technologies TCP/IP stack (version 2.0, circa 2004). The
+same family of stacks shows up widely in operational technology (OT)
+gear — PLCs, transfer switches, water and power infrastructure — and
+its known vulnerabilities are actively exploited. There are no
+firmware patches available for most of these controllers, so
+protecting the generator is a matter of controlling who can reach it
+on the network. This guidance mirrors what agencies like CISA and
+the Washington State Department of Health tell operators of
+unpatchable OT devices (see the [WA DOH bulletin][wadoh] for a
+recent example).
+
+**Do not expose the generator's web interface to the public
+internet.** Do not forward ports to it, do not put it on a DMZ, and
+do not rely on the built-in password as a security boundary — HTTP
+Basic auth over cleartext HTTP is trivially observed. If you need
+remote access, reach it through your Home Assistant instance over a
+VPN.
+
+**Isolate the generator on a segmented network.** Put it on a
+management or IoT VLAN with firewall rules that only permit
+inbound traffic from your Home Assistant host on TCP/80. Block all
+outbound traffic from the generator; it has no business initiating
+connections. If your router supports client isolation on the VLAN,
+enable it.
+
+**Change the default password.** The factory password is `cummins`
+and is documented publicly. Set something unique, and store it in a
+password manager. The integration's options flow lets you rotate it
+without re-adding the integration.
+
+**Monitor for the unexpected.** If you keep any kind of network
+telemetry (firewall logs, Home Assistant recorder for the
+integration's request-error entities, packet capture), watch for
+inbound connection attempts to the generator from anything other
+than your HA host, and for outbound traffic from the generator
+itself. Alerts on either are a strong signal something is wrong.
+
+**Keep physical controls in the loop.** The generator's front-panel
+switch remains authoritative. Leave it in REMOTE only when you
+actually need the integration's control features to work; otherwise
+the physical position of the switch is a hard stop that no network
+attacker can bypass.
+
+If you suspect the generator has been tampered with over the
+network, isolate it (pull the Ethernet cable) and reset it to
+factory settings. Operators of public infrastructure or systems
+tied to a federal reporting obligation should report the incident
+through their usual channel (e.g. [CISA][cisa]); for a residential
+install this generally isn't required, but the same isolate-then-
+rebuild steps still apply.
+
+[wadoh]: https://content.govdelivery.com/accounts/WADOH/bulletins/422e976
+[cisa]: https://www.cisa.gov/report
+
 ## Supported Models
 
 This integration works with Cummins generators that have the standard web interface with the following endpoints:
