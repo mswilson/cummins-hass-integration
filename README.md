@@ -108,9 +108,12 @@ the physical position of the switch is a hard stop that no network
 attacker can bypass.
 
 If you suspect the generator has been tampered with over the
-network, isolate it (pull the Ethernet cable), reset it to factory
-settings, and report the incident to [CISA][cisa] and your local
-utility authority.
+network, isolate it (pull the Ethernet cable) and reset it to
+factory settings. Operators of public infrastructure or systems
+tied to a federal reporting obligation should report the incident
+through their usual channel (e.g. [CISA][cisa]); for a residential
+install this generally isn't required, but the same isolate-then-
+rebuild steps still apply.
 
 [wadoh]: https://content.govdelivery.com/accounts/WADOH/bulletins/422e976
 [cisa]: https://www.cisa.gov/report
