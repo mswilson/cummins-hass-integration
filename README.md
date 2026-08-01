@@ -1,5 +1,15 @@
 # Cummins Generator Home Assistant Integration
 
+[![Integration Usage][integration-usage-shield]][integration-usage]
+[![GitHub Downloads][downloads-shield]][releases]
+[![GitHub Latest Downloads][downloads-latest-shield]][releases]
+[![GitHub Release][releases-shield]][releases]
+[![GitHub Release Date][release-date-shield]][releases]
+[![GitHub Activity][commits-shield]][commits]
+[![License][license-shield]](LICENSE)
+[![hacs][hacsbadge]][hacs]
+![Project Maintenance][maintenance-shield]
+
 A Home Assistant custom integration for monitoring and controlling Cummins standby generators with web interfaces.
 
 ## Features
@@ -159,3 +169,18 @@ As this is a machine-produced integration, I make no claims of human
 authorship. For any exclusive rights that are awarded to me that _can_
 be licensed with the Apache License 2.0, that is the legal instrument
 I elect to use to grant license to you.
+
+
+[integration-usage-shield]: https://img.shields.io/badge/dynamic/json?color=41BDF5&logo=home-assistant&label=integration%20usage&suffix=%20installs&cacheSeconds=15600&url=https%3A%2F%2Fanalytics.home-assistant.io%2Fcustom_integrations.json&query=%24.cummins_generator.total&style=for-the-badge
+[integration-usage]: https://analytics.home-assistant.io/custom_integrations.json
+[commits-shield]: https://img.shields.io/github/last-commit/mswilson/cummins-hass-integration?style=for-the-badge
+[commits]: https://github.com/mswilson/cummins-hass-integration/commits/main
+[hacs]: https://github.com/custom-components/hacs
+[hacsbadge]: https://img.shields.io/badge/HACS-Custom-blue.svg?style=for-the-badge
+[license-shield]: https://img.shields.io/github/license/mswilson/cummins-hass-integration.svg?style=for-the-badge
+[maintenance-shield]: https://img.shields.io/badge/Maintainers-%40mswilson-blue.svg?style=for-the-badge
+[downloads-shield]: https://img.shields.io/github/downloads/mswilson/cummins-hass-integration/total.svg?style=for-the-badge
+[downloads-latest-shield]: https://img.shields.io/github/downloads-pre/mswilson/cummins-hass-integration/latest/total?style=for-the-badge
+[releases-shield]: https://img.shields.io/github/release/mswilson/cummins-hass-integration.svg?style=for-the-badge
+[release-date-shield]: https://img.shields.io/github/release-date/mswilson/cummins-hass-integration?style=for-the-badge
+[releases]: https://github.com/mswilson/cummins-hass-integration/releases
