@@ -11,7 +11,11 @@ from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
 DOMAIN = "cummins_generator"
-SCAN_INTERVAL = timedelta(seconds=30)
+# One endpoint per tick; three endpoints -> ~5 minute refresh per endpoint.
+# Keeps total request rate to the generator well below what causes the
+# InterNiche 2.0 stack to run out of packet buffers. See
+# docs/generator-network-stack.md.
+SCAN_INTERVAL = timedelta(seconds=100)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator select entities."""
@@ -31,35 +35,67 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     async_add_entities(selects)
 
 class CumminsLoadCoordinator(DataUpdateCoordinator):
-    """Data coordinator for Cummins Generator load management."""
+    """Data coordinator for Cummins Generator load management.
+
+    Each tick fetches a single endpoint, cycling through the three
+    endpoints below. On a `SCAN_INTERVAL` of 100 s, every endpoint sees
+    a fresh read every 5 minutes. The last-known values for the other
+    two endpoints are preserved so entities stay populated.
+    """
+
+    ENDPOINTS = ("loads_data", "loads", "exercise")
 
     def __init__(self, hass, client):
         """Initialize the coordinator."""
         super().__init__(hass, _LOGGER, name="Cummins Load", update_interval=SCAN_INTERVAL)
         self.client = client
         self.host = client.host
+        self._index = 0
+        self._data: dict = {}
 
     async def _async_update_data(self):
-        """Fetch load data from the generator."""
+        """Fetch one endpoint's worth of load data."""
+        endpoint = self.ENDPOINTS[self._index]
+        self._index = (self._index + 1) % len(self.ENDPOINTS)
         try:
-            load_html = await self.client.get("/loads.html")
-            load_data = self._parse_loads_html(load_html)
-
-            loads_data = await self.client.get("/loads_data.html")
-            lines = loads_data.strip().split('\n')
-            if len(lines) >= 3:
-                load_data.update({
-                    "load_1": "Connected" if int(lines[1]) == 0 else "Disconnected",
-                    "load_2": "Connected" if int(lines[2]) == 0 else "Disconnected",
-                })
-
-            exercise_html = await self.client.get("/exercise.html")
-            exercise_data = self._parse_exercise_html(exercise_html)
-
-            return {**load_data, **exercise_data}
-
+            fresh = await self._fetch_endpoint(endpoint)
         except Exception as err:
             raise UpdateFailed(f"Error communicating with generator: {err}")
+        self._data.update(fresh)
+        return dict(self._data)
+
+    async def refresh_endpoint(self, endpoint: str) -> None:
+        """Fetch a single endpoint immediately, e.g. after a write.
+
+        Bypasses the round-robin cycle and merges the result into the
+        coordinator's data.
+        """
+        try:
+            fresh = await self._fetch_endpoint(endpoint)
+        except Exception as err:
+            _LOGGER.warning("Refresh of %s failed: %s", endpoint, err)
+            return
+        self._data.update(fresh)
+        self.async_set_updated_data(dict(self._data))
+
+    async def _fetch_endpoint(self, endpoint: str) -> dict:
+        """Fetch one endpoint and return its parsed key/value pairs."""
+        if endpoint == "loads":
+            html = await self.client.get("/loads.html")
+            return self._parse_loads_html(html)
+        if endpoint == "loads_data":
+            body = await self.client.get("/loads_data.html")
+            lines = body.strip().split('\n')
+            if len(lines) < 3:
+                return {}
+            return {
+                "load_1": "Connected" if int(lines[1]) == 0 else "Disconnected",
+                "load_2": "Connected" if int(lines[2]) == 0 else "Disconnected",
+            }
+        if endpoint == "exercise":
+            html = await self.client.get("/exercise.html")
+            return self._parse_exercise_html(html)
+        return {}
 
     def _parse_loads_html(self, html):
         """Parse load management mode from HTML."""
@@ -141,30 +177,37 @@ class CumminsGeneratorSelect(CoordinatorEntity, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
+        refresh_endpoint = "loads"
         if self.select_type == "load_mode":
             value = "1" if option == "Manual" else "2"
             path = f"/wr_logical.cgi?@426={value}"
         elif self.select_type == "load_1":
             value = "3" if option == "Disconnected" else "4"
             path = f"/wr_logical.cgi?@426={value}"
+            refresh_endpoint = "loads_data"
         elif self.select_type == "load_2":
             value = "5" if option == "Disconnected" else "6"
             path = f"/wr_logical.cgi?@426={value}"
+            refresh_endpoint = "loads_data"
         elif self.select_type == "exercise_frequency":
             value = ["0", "1", "2", "3"][["Never", "Weekly", "Bimonthly", "Monthly"].index(option)]
             path = f"/wr_logical.cgi?@425={value}"
+            refresh_endpoint = "exercise"
         elif self.select_type == "exercise_day":
             value = str(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].index(option))
             path = f"/wr_logical.cgi?@391={value}"
+            refresh_endpoint = "exercise"
         elif self.select_type == "exercise_hour":
             path = f"/wr_logical.cgi?@392={option}"
+            refresh_endpoint = "exercise"
         elif self.select_type == "exercise_minute":
             path = f"/wr_logical.cgi?@393={option}"
+            refresh_endpoint = "exercise"
         else:
             return
 
         try:
             await self.coordinator.client.get(path)
-            await self.coordinator.async_request_refresh()
+            await self.coordinator.refresh_endpoint(refresh_endpoint)
         except Exception as err:
             _LOGGER.error("Error setting %s: %s", self._name, err)

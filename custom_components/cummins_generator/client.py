@@ -36,9 +36,14 @@ async def validate_credentials(hass, host: str, password: str) -> None:
     ).decode("ascii")
     url = f"http://{host}/index_data.html"
     timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
+    headers = {
+        "Authorization": auth_header,
+        "Connection": "close",
+        "Accept-Encoding": "identity",
+    }
     try:
         async with session.get(
-            url, headers={"Authorization": auth_header}, timeout=timeout
+            url, headers=headers, timeout=timeout
         ) as response:
             if response.status == 401:
                 raise InvalidAuth
@@ -74,13 +79,24 @@ class GeneratorClient:
 
     async def get(self, path: str) -> str:
         """Issue a serialized, rate-limited GET and return the body text."""
-        headers = {"Authorization": self._auth_header}
+        # Explicit close + identity encoding + no compression tokens the
+        # generator's InterNiche 2.0 stack may not recognize. See
+        # docs/generator-network-stack.md for the reasoning.
+        headers = {
+            "Authorization": self._auth_header,
+            "Connection": "close",
+            "Accept-Encoding": "identity",
+        }
         timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
         url = f"http://{self.host}{path}"
 
         async with self._lock:
             if self._session is None:
-                self._session = aiohttp.ClientSession()
+                # force_close=True prevents aiohttp from pooling a
+                # connection the server is going to FIN anyway.
+                self._session = aiohttp.ClientSession(
+                    connector=aiohttp.TCPConnector(force_close=True)
+                )
 
             now = self._hass.loop.time()
             wait = self._min_gap - (now - self._last_request_end)
