@@ -194,7 +194,12 @@ The setting remains user-tunable through the options flow.
 - **Assume every request holds a TCB on the generator for 60 s
   after it completes.** Design your polling budget with that in
   mind: at most `N` requests per 60 s, where `N` is comfortably
-  below 7.
+  below 7. This budget applies to startup bursts too. The load
+  coordinator's startup hydration path (see
+  `async_hydrate_remaining` in `select.py`) walks the round-robin
+  once at setup to fill in all endpoints, but it goes through the
+  client's serialized lock and 2 s min-gap just like steady-state
+  traffic — no fan-out.
 - **Assume `pk_alloc` failures are silent.** From your side, they
   manifest as either a body-read timeout or (later) a
   connection-refused. Log accordingly, but don't retry
