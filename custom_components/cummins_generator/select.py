@@ -11,14 +11,23 @@ from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
 DOMAIN = "cummins_generator"
-SCAN_INTERVAL = timedelta(seconds=30)
+# One endpoint per tick; three endpoints -> ~5 minute refresh per endpoint.
+# Keeps total request rate to the generator well below what causes the
+# InterNiche 2.0 stack to run out of packet buffers. See
+# docs/generator-network-stack.md.
+SCAN_INTERVAL = timedelta(seconds=100)
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Cummins Generator select entities."""
     client = hass.data[DOMAIN][config_entry.entry_id]["client"]
     coordinator = CumminsLoadCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()
-    
+    # Fill in the endpoints first_refresh didn't cover so all seven
+    # select entities come up with real values within seconds of HA
+    # start, rather than sitting Unknown until the round-robin gets
+    # to them (up to ~200 s later).
+    hass.async_create_task(coordinator.async_hydrate_remaining())
+
     selects = [
         CumminsGeneratorSelect(coordinator, "load_mode", "Load Mode", ["Manual", "Automatic"]),
         CumminsGeneratorSelect(coordinator, "load_1", "Load 1", ["Disconnected", "Connected"]),
@@ -31,35 +40,93 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     async_add_entities(selects)
 
 class CumminsLoadCoordinator(DataUpdateCoordinator):
-    """Data coordinator for Cummins Generator load management."""
+    """Data coordinator for Cummins Generator load management.
+
+    Each tick fetches a single endpoint, cycling through the three
+    endpoints below. On a `SCAN_INTERVAL` of 100 s, every endpoint sees
+    a fresh read every 5 minutes. The last-known values for the other
+    two endpoints are preserved so entities stay populated.
+    """
+
+    ENDPOINTS = ("loads_data", "loads", "exercise")
 
     def __init__(self, hass, client):
         """Initialize the coordinator."""
         super().__init__(hass, _LOGGER, name="Cummins Load", update_interval=SCAN_INTERVAL)
         self.client = client
         self.host = client.host
+        self._index = 0
+        self._data: dict = {}
 
     async def _async_update_data(self):
-        """Fetch load data from the generator."""
+        """Fetch one endpoint's worth of load data."""
+        endpoint = self.ENDPOINTS[self._index]
+        self._index = (self._index + 1) % len(self.ENDPOINTS)
         try:
-            load_html = await self.client.get("/loads.html")
-            load_data = self._parse_loads_html(load_html)
-
-            loads_data = await self.client.get("/loads_data.html")
-            lines = loads_data.strip().split('\n')
-            if len(lines) >= 3:
-                load_data.update({
-                    "load_1": "Connected" if int(lines[1]) == 0 else "Disconnected",
-                    "load_2": "Connected" if int(lines[2]) == 0 else "Disconnected",
-                })
-
-            exercise_html = await self.client.get("/exercise.html")
-            exercise_data = self._parse_exercise_html(exercise_html)
-
-            return {**load_data, **exercise_data}
-
+            fresh = await self._fetch_endpoint(endpoint)
         except Exception as err:
             raise UpdateFailed(f"Error communicating with generator: {err}")
+        self._data.update(fresh)
+        return dict(self._data)
+
+    async def async_hydrate_remaining(self) -> None:
+        """Fetch the endpoints not yet covered by the first refresh.
+
+        Called once at setup after `async_config_entry_first_refresh`
+        so the remaining select entities populate within seconds of
+        HA start instead of waiting for the 100 s round-robin to reach
+        them. Requests still go through the client's serialized lock
+        and inter-request gap, so the burst is paced identically to
+        steady-state traffic and stays well inside the generator's
+        7-connection listen backlog. See
+        docs/generator-network-stack.md.
+
+        After first refresh the round-robin cursor sits at the *next*
+        endpoint to fetch, so `_index .. end .. 0 .. _index-1` covers
+        the two we still need, in the same order the round-robin
+        would have visited them.
+        """
+        rotated = self.ENDPOINTS[self._index:] + self.ENDPOINTS[:self._index]
+        for endpoint in rotated[:-1]:  # drop the one first-refresh handled
+            try:
+                fresh = await self._fetch_endpoint(endpoint)
+            except Exception as err:
+                _LOGGER.warning(
+                    "Startup hydration of %s failed; will retry on next tick: %s",
+                    endpoint, err,
+                )
+                continue
+            self._data.update(fresh)
+        self.async_set_updated_data(dict(self._data))
+
+    def apply_local_update(self, update: dict) -> None:
+        """Overwrite cached values without re-reading the generator.
+
+        Used after a successful write when the generator's HTML would
+        otherwise still render a stale value for the next few seconds.
+        The next scheduled poll of that endpoint will re-verify.
+        """
+        self._data.update(update)
+        self.async_set_updated_data(dict(self._data))
+
+    async def _fetch_endpoint(self, endpoint: str) -> dict:
+        """Fetch one endpoint and return its parsed key/value pairs."""
+        if endpoint == "loads":
+            html = await self.client.get("/loads.html")
+            return self._parse_loads_html(html)
+        if endpoint == "loads_data":
+            body = await self.client.get("/loads_data.html")
+            lines = body.strip().split('\n')
+            if len(lines) < 3:
+                return {}
+            return {
+                "load_1": "Connected" if int(lines[1]) == 0 else "Disconnected",
+                "load_2": "Connected" if int(lines[2]) == 0 else "Disconnected",
+            }
+        if endpoint == "exercise":
+            html = await self.client.get("/exercise.html")
+            return self._parse_exercise_html(html)
+        return {}
 
     def _parse_loads_html(self, html):
         """Parse load management mode from HTML."""
@@ -140,7 +207,15 @@ class CumminsGeneratorSelect(CoordinatorEntity, SelectEntity):
         return self.coordinator.data.get(self.select_type)
 
     async def async_select_option(self, option: str) -> None:
-        """Change the selected option."""
+        """Change the selected option.
+
+        After a successful write, we adopt the value locally rather
+        than re-reading. The generator's HTML endpoints render from
+        state that lags the write by a few seconds, so an immediate
+        read-back would clobber our new value with the old one. The
+        next scheduled poll of the endpoint (up to ~5 min later) will
+        re-verify and self-correct if the write didn't actually take.
+        """
         if self.select_type == "load_mode":
             value = "1" if option == "Manual" else "2"
             path = f"/wr_logical.cgi?@426={value}"
@@ -165,6 +240,7 @@ class CumminsGeneratorSelect(CoordinatorEntity, SelectEntity):
 
         try:
             await self.coordinator.client.get(path)
-            await self.coordinator.async_request_refresh()
         except Exception as err:
             _LOGGER.error("Error setting %s: %s", self._name, err)
+            return
+        self.coordinator.apply_local_update({self.select_type: option})

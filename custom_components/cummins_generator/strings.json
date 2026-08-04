@@ -26,7 +26,7 @@
         "description": "The generator's embedded controller can lock up when it receives concurrent requests. Requests from this integration are already serialized; the delay setting adds a minimum gap between them.",
         "data": {
           "password": "Password",
-          "min_request_gap_ms": "Minimum delay between requests (ms, default 500)"
+          "min_request_gap_ms": "Minimum delay between requests (ms, default 2000)"
         }
       }
     },

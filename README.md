@@ -45,11 +45,11 @@ The integration polls the generator's web interface on a per-platform cadence:
 |---|---|---|
 | Sensors (status, voltages, frequency, engine hours, loads) | 30 s | `/index_data.html` |
 | Binary sensors (utility, running, standby, action required) | 30 s | shares the sensor poll |
-| Load & exercise selects | 30 s | `/loads_data.html`, `/exercise.html` |
+| Load & exercise selects | 100 s per endpoint, rotating (~5 min per endpoint) | `/loads_data.html`, `/loads.html`, `/exercise.html` |
 | Date/time entity | 1 h | `/timedate.html` |
 | Buttons | on demand | control endpoints only |
 
-Requests are additionally spaced out by a configurable minimum request gap (default 500 ms) to avoid overwhelming the generator's web interface.
+Requests are additionally spaced out by a configurable minimum request gap (default 2000 ms) to avoid overwhelming the generator's embedded network stack. For the reasoning — including source-level analysis of the InterNiche 2.0 TCP/IP stack — see [docs/generator-network-stack.md](docs/generator-network-stack.md).
 
 ## Installation
 
