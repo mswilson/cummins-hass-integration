@@ -10,7 +10,7 @@
 [![hacs][hacsbadge]][hacs]
 ![Project Maintenance][maintenance-shield]
 
-A Home Assistant custom integration for monitoring and controlling Cummins standby generators with web interfaces.
+A Home Assistant integration for monitoring and controlling Cummins standby generators with web interfaces.
 
 ## Features
 
@@ -175,8 +175,8 @@ I elect to use to grant license to you.
 [integration-usage]: https://analytics.home-assistant.io/custom_integrations.json
 [commits-shield]: https://img.shields.io/github/last-commit/mswilson/cummins-hass-integration?style=for-the-badge
 [commits]: https://github.com/mswilson/cummins-hass-integration/commits/main
-[hacs]: https://github.com/custom-components/hacs
-[hacsbadge]: https://img.shields.io/badge/HACS-Custom-blue.svg?style=for-the-badge
+[hacs]: https://github.com/hacs/integration
+[hacsbadge]: https://img.shields.io/badge/HACS-Default-blue.svg?style=for-the-badge
 [license-shield]: https://img.shields.io/github/license/mswilson/cummins-hass-integration.svg?style=for-the-badge
 [maintenance-shield]: https://img.shields.io/badge/Maintainers-%40mswilson-blue.svg?style=for-the-badge
 [downloads-shield]: https://img.shields.io/github/downloads/mswilson/cummins-hass-integration/total.svg?style=for-the-badge
