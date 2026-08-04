@@ -64,18 +64,14 @@ class CumminsLoadCoordinator(DataUpdateCoordinator):
         self._data.update(fresh)
         return dict(self._data)
 
-    async def refresh_endpoint(self, endpoint: str) -> None:
-        """Fetch a single endpoint immediately, e.g. after a write.
+    def apply_local_update(self, update: dict) -> None:
+        """Overwrite cached values without re-reading the generator.
 
-        Bypasses the round-robin cycle and merges the result into the
-        coordinator's data.
+        Used after a successful write when the generator's HTML would
+        otherwise still render a stale value for the next few seconds.
+        The next scheduled poll of that endpoint will re-verify.
         """
-        try:
-            fresh = await self._fetch_endpoint(endpoint)
-        except Exception as err:
-            _LOGGER.warning("Refresh of %s failed: %s", endpoint, err)
-            return
-        self._data.update(fresh)
+        self._data.update(update)
         self.async_set_updated_data(dict(self._data))
 
     async def _fetch_endpoint(self, endpoint: str) -> dict:
@@ -176,38 +172,40 @@ class CumminsGeneratorSelect(CoordinatorEntity, SelectEntity):
         return self.coordinator.data.get(self.select_type)
 
     async def async_select_option(self, option: str) -> None:
-        """Change the selected option."""
-        refresh_endpoint = "loads"
+        """Change the selected option.
+
+        After a successful write, we adopt the value locally rather
+        than re-reading. The generator's HTML endpoints render from
+        state that lags the write by a few seconds, so an immediate
+        read-back would clobber our new value with the old one. The
+        next scheduled poll of the endpoint (up to ~5 min later) will
+        re-verify and self-correct if the write didn't actually take.
+        """
         if self.select_type == "load_mode":
             value = "1" if option == "Manual" else "2"
             path = f"/wr_logical.cgi?@426={value}"
         elif self.select_type == "load_1":
             value = "3" if option == "Disconnected" else "4"
             path = f"/wr_logical.cgi?@426={value}"
-            refresh_endpoint = "loads_data"
         elif self.select_type == "load_2":
             value = "5" if option == "Disconnected" else "6"
             path = f"/wr_logical.cgi?@426={value}"
-            refresh_endpoint = "loads_data"
         elif self.select_type == "exercise_frequency":
             value = ["0", "1", "2", "3"][["Never", "Weekly", "Bimonthly", "Monthly"].index(option)]
             path = f"/wr_logical.cgi?@425={value}"
-            refresh_endpoint = "exercise"
         elif self.select_type == "exercise_day":
             value = str(["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].index(option))
             path = f"/wr_logical.cgi?@391={value}"
-            refresh_endpoint = "exercise"
         elif self.select_type == "exercise_hour":
             path = f"/wr_logical.cgi?@392={option}"
-            refresh_endpoint = "exercise"
         elif self.select_type == "exercise_minute":
             path = f"/wr_logical.cgi?@393={option}"
-            refresh_endpoint = "exercise"
         else:
             return
 
         try:
             await self.coordinator.client.get(path)
-            await self.coordinator.refresh_endpoint(refresh_endpoint)
         except Exception as err:
             _LOGGER.error("Error setting %s: %s", self._name, err)
+            return
+        self.coordinator.apply_local_update({self.select_type: option})
