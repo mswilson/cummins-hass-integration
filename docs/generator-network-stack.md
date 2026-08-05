@@ -16,7 +16,10 @@ back-to-back requests every 30 s at 500 ms spacing) it took roughly
 20 minutes for the TCB / packet-buffer pool to deplete, at which
 point body sends silently fail (client sees a read timeout), then
 new SYNs are silently dropped (client sees connect-refuse), and the
-box wedges indefinitely. Recovery requires a power cycle.
+box wedges indefinitely. Recovery requires either a full power
+cycle or (less disruptively) bouncing the Ethernet interface from
+the in-home display — see [Recovering from a
+hang](#recovering-from-a-hang) below.
 
 This is not a known CVE. It is straightforward resource
 under-provisioning in the 2.x stack combined with a client that was
@@ -38,7 +41,7 @@ On 2026-08-01 15:23:42, in the middle of a 20-minute run of clean
    That's the signature of TCP connect never completing — no SYN/ACK.
 4. The controller stays wedged. An HA restart at 00:09 fails to
    connect at all. First successful request is at 09:54 the next
-   morning after a power cycle.
+   morning, after bouncing the interface (see below).
 
 Two-phase failure — body-read timeouts, then connect refuse — is the
 key signal. It tells us the stack is running out of TX-side buffers
@@ -184,6 +187,37 @@ The setting remains user-tunable through the options flow.
   `GET` don't include `OPTIONS` or other unknown methods.
 - **Malicious traffic or auth issues.** No 401s, no config changes,
   no writes from us in the pre-failure window.
+
+## Recovering from a hang
+
+You do **not** have to power-cycle the generator to recover once the
+network stack has wedged. Two options, easiest first:
+
+1. **Bounce the Ethernet interface from the in-home display.** Walk
+   through the display's network menu and force the interface to
+   re-initialize:
+
+   - Switch the interface mode from **DHCP** to **Static**.
+   - Change any field on the static config (an IP address that
+     doesn't conflict is fine — it doesn't have to be reachable).
+   - Switch back to **DHCP**.
+   - Let the DHCP lease establish; the controller should return to
+     its usual IP within a minute or two.
+
+   Toggling the mode re-runs the stack's interface-up path, which
+   reinitializes the packet-buffer queues and clears whatever TCB
+   state was accumulated. HTTP polling resumes as soon as the lease
+   is up.
+
+2. **Power-cycle the generator.** Same effect, more disruptive
+   (you're cycling the whole controller). Use this if the in-home
+   display isn't accessible or the network menu itself is
+   unresponsive.
+
+Note that **HA-side restarts do not help** — the wedge is in the
+generator, not in the integration. In the 2026-08-01 incident, an
+HA restart at 00:09 also failed to connect; the box only came back
+after intervention at the physical unit.
 
 ## If you're changing this code, keep these in mind
 
